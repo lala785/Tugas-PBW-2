@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SITTA - Stok Bahan Ajar</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container" id="appStok">
+        <h1>Stok Bahan Ajar</h1>
+        <nav>
+            <a href="index.html">Home</a> |
+            <a href="tracking.html">Tracking DO</a> 
+        </nav>
+
+        <!-- Panel Filter dan Sort -->
+        <div class="filter-panel">
+            <div class="filter-group">
+                <label>UT-Daerah:</label>
+                <select v-model="filterUt">
+                    <option value="">Semua</option>
+                    <option v-for="ut in upbjjList" :value="ut">{{ ut }}</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Kategori:</label>
+                <select v-model="filterKategori" :disabled="!filterUt">
+                    <option value="">Semua</option>
+                    <option v-for="kat in availableKategoriList" :value="kat">{{ kat }}</option>
+                </select>
+                <small v-if="!filterUt" class="error">Pilih UT-Daerah terlebih dahulu</small>
+            </div>
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" v-model="filterReorderOnly"> Hanya stok perlu re-order (stok &lt; safety atau stok = 0)
+                </label>
+            </div>
+            <div class="filter-group">
+                <label>Urutkan berdasarkan:</label>
+                <select v-model="sortBy">
+                    <option value="judul">Judul</option>
+                    <option value="qty">Stok</option>
+                    <option value="harga">Harga</option>
+                </select>
+                <select v-model="sortOrder">
+                    <option value="asc">A-Z</option>
+                    <option value="desc">Z-A</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button @click="resetFilters">Reset Filter</button>
+            </div>
+        </div>
+
+        <!-- Tombol Tambah Data -->
+        <button @click="showAddModal = true">+ Tambah Bahan Ajar Baru</button>
+
+        <!-- Tabel Stok dengan kolom Harga -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Kode / Nama Mata Kuliah</th>
+                    <th>Kategori</th>
+                    <th>UT-Daerah</th>
+                    <th>Lokasi Rak</th>
+                    <th>Harga</th>
+                    <th>Jumlah Stok</th>
+                    <th>Safety Stok</th>
+                    <th>Status</th>
+                    <th>Catatan</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="(item, idx) in sortedStok" :key="item.kode + item.upbjj">
+                    <td>{{ item.kode }} - {{ item.judul }}</td>
+                    <td>{{ item.kategori }}</td>
+                    <td>{{ item.upbjj }}</td>
+                    <td>{{ item.lokasiRak }}</td>
+                    <td class="harga-col">Rp {{ formatHarga(item.harga) }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>{{ item.safety }}</td>
+                    <td>
+                        <span :class="statusClass(item)">
+                            {{ statusText(item) }}
+                        </span>
+                    </td>
+                    <td v-html="item.catatanHTML"></td>
+                    <td>
+                        <button @click="editItem(item)">Edit</button>
+                    </td>
+                </tr>
+                <tr v-if="sortedStok.length === 0">
+                    <td colspan="10">Tidak ada data stok.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Modal Tambah / Edit -->
+        <div class="modal" :style="{display: (showAddModal || showEditModal) ? 'flex' : 'none'}">
+            <div class="modal-content">
+                <h3>{{ modalTitle }}</h3>
+                <div class="form-row">
+                    <label>Kode MK:</label>
+                    <input v-model="formData.kode" :disabled="isEditMode">
+                    <div class="error" v-if="errors.kode">{{ errors.kode }}</div>
+                </div>
+                <div class="form-row">
+                    <label>Nama MK:</label>
+                    <input v-model="formData.judul">
+                    <div class="error" v-if="errors.judul">{{ errors.judul }}</div>
+                </div>
+                <div class="form-row">
+                    <label>Kategori:</label>
+                    <select v-model="formData.kategori">
+                        <option v-for="kat in kategoriList" :value="kat">{{ kat }}</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>UT-Daerah:</label>
+                    <select v-model="formData.upbjj">
+                        <option v-for="ut in upbjjList" :value="ut">{{ ut }}</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>Lokasi Rak:</label>
+                    <input v-model="formData.lokasiRak">
+                </div>
+                <div class="form-row">
+                    <label>Harga (Rp):</label>
+                    <input type="number" v-model.number="formData.harga" placeholder="Masukkan harga">
+                    <div class="error" v-if="errors.harga">{{ errors.harga }}</div>
+                </div>
+                <div class="form-row">
+                    <label>Jumlah Stok:</label>
+                    <input type="number" v-model.number="formData.qty">
+                </div>
+                <div class="form-row">
+                    <label>Safety Stok:</label>
+                    <input type="number" v-model.number="formData.safety">
+                </div>
+                <div class="form-row">
+                    <label>Catatan HTML:</label>
+                    <input v-model="formData.catatanHTML">
+                </div>
+                <div class="form-row">
+                    <button @click="saveItem">Simpan</button>
+                    <button @click="closeModal" class="btn-secondary">Batal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
+    <script src="js/stok-app.js" defer></script>
+</body>
+</html>
